@@ -1,6 +1,6 @@
 pkgname=archivedir
 pkgver=0.2.2
-pkgrel=1
+pkgrel=2
 pkgdesc="Archive files in a target directory older than a given age"
 arch=('any')
 license=('MIT')
@@ -11,7 +11,7 @@ source=(
   ${pkgname}.service
   ${pkgname}.timer
 )
-md5sums=('f152e0b4685b3955d6ea14bf6ecdef76'
+md5sums=('0fb687af83ba47aebfcc40b37bd5e0bd'
          '5a330e8e84afc7c1bd5cd860ce1f3e33'
          '9000ec705af46ea5fd1d49176b325590'
          '280de9bea28be2b60022dde715d7a3f2')
