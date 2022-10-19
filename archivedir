@@ -1,0 +1,56 @@
+#!/bin/bash
+
+DAYS=182
+DEPTH=1
+BYMONTH=
+BYDAY=
+FLAT='/'
+
+usage() {
+  echo todo
+}
+
+err() {
+  local msg="${1}"
+  usage "ERR ${msg}"
+  exit 1
+}
+
+while getopts 't:z:mdfh?' arg; do
+  case "${arg}" in
+    t) DAYS="${OPTARG}" ;;
+    z) DEPTH="${OPTARG}" ;;
+    m) BYMONTH="true" ;;
+    d) BYDAY="true" ;;
+    f) FLAT="-" ;;
+    h|?) usage ;;
+    *) err "invalid argument '${arg}'" ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+TARGET="${1}"
+[[ -z "${TARGET}" ]] && err 'no target given'
+! [[ -d "${TARGET}" ]] && err 'target is not a directory'
+[[ -n "${BYDAY}" ]] && BYMONTH="true"
+
+COUNT=0
+
+for np in $(find "${TARGET}" -maxdepth ${DEPTH} -type f -mtime "+${DAYS}"); do
+  mtime=$(stat -c %y "${np}" | grep -Eo '^\S+')
+  year=$(echo "${mtime}" | cut -d - -f 1)
+  month=$(echo "${mtime}" | cut -d - -f 2)
+  day=$(echo "${mtime}" | cut -d - -f 3)
+  dir="${TARGET}/${year}"
+  [[ -n "${BYMONTH}" ]] && dir="${dir}${FLAT}${month}"
+  [[ -n "${BYDAY}" ]] && dir="${dir}${FLAT}${day}"
+  mkdir -p "${dir}"
+  mv "${np}" "${dir}"
+  npb="$(basename "${np}")"
+  dd="$(dirname "${TARGET}")"
+  rd=$(realpath --relative-to="${dd}" "${dir}")
+  echo "archived ${npb} to ${rd}"
+  COUNT=$((COUNT+1))
+done
+
+echo "archived ${COUNT} files"

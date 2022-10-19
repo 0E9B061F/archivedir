@@ -1,0 +1,7 @@
+[Unit]
+Description=Archive directories per configuration
+
+[Service]
+Type=oneshot
+WorkingDirectory=/tmp
+ExecStart=/usr/bin/archivedir-runner

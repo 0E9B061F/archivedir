@@ -1,0 +1,10 @@
+#!/bin/bash
+
+RUNFILE="/etc/archivedirtab"
+RUNDIR="/etc/archivedirtab.d"
+
+cat "${RUNFILE}" "${RUNDIR}"/* 2> /dev/null | while read line; do
+  echo "${line}"
+  archivedir ${line}
+done
+
