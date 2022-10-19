@@ -1,5 +1,5 @@
 pkgname=archivedir
-pkgver=0.1.4
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Archive directories per configuration"
 arch=('any')

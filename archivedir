@@ -2,13 +2,51 @@
 
 DAYS=182
 DEPTH=1
+STICKY=
 BYMONTH=
 BYDAY=
 FLAT='/'
+WRAP=
+SIMPLE=
 
-usage() {
-  echo todo
-}
+MP="[0-9][0-9]"
+YP="[0-9][0-9][0-9][0-9]"
+
+read -r -d '' USAGE <<'EOF'
+Archive files in TARGET directory older than a given age. Archived items are
+placed in a subdirectory of TARGET. The subdirectory archive is structured
+according the options given. By default the subdirectory name will be the year
+of the file's modification time.
+
+archivedir [-t DAYS] [-z DEPTH] [-x] [-m] [-d] [-f] [-w] [-s] TARGET
+  -t DAYS
+    Archive limit in days. Files not modified within this period will be
+    archived. 
+    Default: 182
+  -z DEPTH
+    Maximum deth to descend to when considering files to archive.
+    Default: 1
+  -x
+    Enable sticky files. Files with names in allcaps are sticky. Sticky files
+    will never be archived,
+  -m
+    Include month in dated archive name.
+  -d
+    Include day in dated archive name. Implies `-m`
+  -f
+    Flat mode. Rather than nesting dated archive structures, encode all date
+    information in a single directory.
+    For example, `TARGET/2022/10/19` becomes`TARGET/2022-10-19`
+  -w
+    Wrap mode. Places dated archive directory structures beneath a single
+    archive root named "archive".
+    For example, `TARGET/2022/10/19` becomes`TARGET/archive/2022/10/19`
+  -s
+    Simple mode. Archive files under `TARGET/archive` with no dated directory
+    structure. Invalidates date-related options.
+  -h
+    Display this help message and exit.
+EOF
 
 err() {
   local msg="${1}"
@@ -16,15 +54,39 @@ err() {
   exit 1
 }
 
-while getopts 't:z:mdfh?' arg; do
+mvsafe() {
+  local a="${1}"
+  local b="${2}"
+  if [[ -f "${b}" ]]; then
+    bd="$(dirname "${b}")"
+    bb="$(basename "${b}")"
+    while [[ -f "${b}" ]]; do
+      bb="_${bb}"
+      b="${bd}/${bb}"
+    done
+  fi
+  mv "${a}" "${b}"
+}
+
+test_sticky() {
+  local base="${1}"
+  [[ "${base}" =~ ^[A-Z] ]] || return 1
+  local norm="$(sed -e "s/\..*$//" -e "s/[[:punct:]0-9]\+//g" <<< "${base}")"
+  [[ "${norm}" =~ ^[A-Z]+$ ]]
+}
+
+while getopts 't:z:xmdfwsh?' arg; do
   case "${arg}" in
     t) DAYS="${OPTARG}" ;;
     z) DEPTH="${OPTARG}" ;;
+    x) STICKY="true" ;;
     m) BYMONTH="true" ;;
     d) BYDAY="true" ;;
     f) FLAT="-" ;;
-    h|?) usage ;;
-    *) err "invalid argument '${arg}'" ;;
+    w) WRAP="true" ;;
+    s) SIMPLE="true" ;;
+    h|?) echo "${USAGE}"; exit 0 ;;
+    *) err "Invalid argument '${arg}'"; exit 1 ;;
   esac
 done
 shift $((OPTIND - 1))
@@ -34,23 +96,46 @@ TARGET="${1}"
 ! [[ -d "${TARGET}" ]] && err 'target is not a directory'
 [[ -n "${BYDAY}" ]] && BYMONTH="true"
 
-COUNT=0
-
-for np in $(find "${TARGET}" -maxdepth ${DEPTH} -type f -mtime "+${DAYS}"); do
-  mtime=$(stat -c %y "${np}" | grep -Eo '^\S+')
-  year=$(echo "${mtime}" | cut -d - -f 1)
-  month=$(echo "${mtime}" | cut -d - -f 2)
-  day=$(echo "${mtime}" | cut -d - -f 3)
-  dir="${TARGET}/${year}"
-  [[ -n "${BYMONTH}" ]] && dir="${dir}${FLAT}${month}"
-  [[ -n "${BYDAY}" ]] && dir="${dir}${FLAT}${day}"
-  mkdir -p "${dir}"
-  mv "${np}" "${dir}"
-  npb="$(basename "${np}")"
+find "${TARGET}"                           \
+  -maxdepth "${DEPTH}"                     \
+  -type d                                  \
+  "("                                      \
+    -path "${TARGET}/archive"              \
+    -o -path "${TARGET}/${YP}"             \
+    -o -path "${TARGET}/${YP}-${MP}"       \
+    -o -path "${TARGET}/${YP}-${MP}-${MP}" \
+  ")"                                      \
+  -prune                                   \
+  -o                                       \
+  -type f                                  \
+  -mtime "+${DAYS}"                        \
+  -printf "%P\0"                           \
+| while read -d $'\0' np; do
+  if [[ -n "${STICKY}" ]] && test_sticky "$(basename "${np}")"; then
+    echo "${np} is sticky. Will not archive"
+    continue
+  fi
+  fp="${TARGET}/${np}"
+  mtime="$(stat -c %y "${fp}" | grep -Eo '^\S+')"
+  year="$(echo "${mtime}" | cut -d - -f 1)"
+  month="$(echo "${mtime}" | cut -d - -f 2)"
+  day="$(echo "${mtime}" | cut -d - -f 3)"
+  if [[ -n "${SIMPLE}" ]]; then
+    dir="${TARGET}/archive"
+  else
+    if [[ -n "${WRAP}" ]]; then
+      dir="${TARGET}/archive/${year}"
+    else
+      dir="${TARGET}/${year}"
+    fi
+    [[ -n "${BYMONTH}" ]] && dir="${dir}${FLAT}${month}"
+    [[ -n "${BYDAY}" ]] && dir="${dir}${FLAT}${day}"
+  fi
+  out="${dir}/${np}"
+  outd="$(dirname "${out}")"
+  mkdir -p "${outd}"
+  mvsafe "${fp}" "${out}"
   dd="$(dirname "${TARGET}")"
-  rd=$(realpath --relative-to="${dd}" "${dir}")
-  echo "archived ${npb} to ${rd}"
-  COUNT=$((COUNT+1))
+  rd="$(realpath --relative-to="${dd}" "${outd}")"
+  echo "archived ${np} to ${rd}"
 done
-
-echo "archived ${COUNT} files"
