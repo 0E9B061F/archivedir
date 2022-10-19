@@ -1,5 +1,5 @@
-Archive files in directory older than a given age. Archived files are placed in
-a subdirectory.
+Archive files in a target directory older than a given age. Archived files are
+placed in a subdirectory.
 
 Installs two commands, `archivedir` and `archivedir_runner`. `archivedir` may be
 run by hand and archives its target according to the options given.
@@ -31,8 +31,13 @@ Where `TARGET` is a directory to be archived.
 * `-z DEPTH`
   Maximum deth to descend to when considering files to archive. Default: 1
 * `-x`
-  Enable sticky files. Files with names in allcaps are sticky. Sticky files
-  will never be archived,
+  Enable sticky files. Files with the sticky extension will never be
+  archived. By default this is `x`.
+  For example, `foo.x`, `bar.x.note`, and `baz.test.x.md` will all be
+  considered sticky.
+* `-X EXTENSION`
+  Specify the extension used to mark files as sticky.
+  Default: "x"
 * `-m`
   Include month in dated archive name.
 * `-d`

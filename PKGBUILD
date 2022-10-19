@@ -1,5 +1,5 @@
 pkgname=archivedir
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc="Archive files in a target directory older than a given age"
 arch=('any')

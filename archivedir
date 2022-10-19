@@ -3,6 +3,7 @@
 DAYS=182
 DEPTH=1
 STICKY=
+MAGIC='x'
 BYMONTH=
 BYDAY=
 FLAT='/'
@@ -27,8 +28,13 @@ archivedir [-t DAYS] [-z DEPTH] [-x] [-m] [-d] [-f] [-w] [-s] TARGET
     Maximum deth to descend to when considering files to archive.
     Default: 1
   -x
-    Enable sticky files. Files with names in allcaps are sticky. Sticky files
-    will never be archived,
+    Enable sticky files. Files with the sticky extension will never be
+    archived. By default this is `x`.
+    For example, `foo.x`, `bar.x.note`, and `baz.test.x.md` will all be
+    considered sticky.
+  -X EXTENSION
+    Specify the extension used to mark files as sticky.
+    Default: "x"
   -m
     Include month in dated archive name.
   -d
@@ -75,11 +81,12 @@ test_sticky() {
   [[ "${norm}" =~ ^[A-Z]+$ ]]
 }
 
-while getopts 't:z:xmdfwsh?' arg; do
+while getopts 't:z:xX:mdfwsh?' arg; do
   case "${arg}" in
     t) DAYS="${OPTARG}" ;;
     z) DEPTH="${OPTARG}" ;;
     x) STICKY="true" ;;
+    X) MAGIC="${OPTARG}" ;;
     m) BYMONTH="true" ;;
     d) BYDAY="true" ;;
     f) FLAT="-" ;;
@@ -111,8 +118,9 @@ find "${TARGET}"                           \
   -mtime "+${DAYS}"                        \
   -printf "%P\0"                           \
 | while read -d $'\0' np; do
-  if [[ -n "${STICKY}" ]] && test_sticky "$(basename "${np}")"; then
-    echo "${np} is sticky. Will not archive"
+  bn="$(basename "${np}")"
+  if [[ -n "${STICKY}" ]] && [[ "${bn}" =~ .\.${MAGIC}($|\.) ]]; then
+    echo "ignored: ${np}"
     continue
   fi
   fp="${TARGET}/${np}"
@@ -137,5 +145,5 @@ find "${TARGET}"                           \
   mvsafe "${fp}" "${out}"
   dd="$(dirname "${TARGET}")"
   rd="$(realpath --relative-to="${dd}" "${outd}")"
-  echo "archived ${np} to ${rd}"
+  echo "archived: ${np} to ${rd}"
 done
